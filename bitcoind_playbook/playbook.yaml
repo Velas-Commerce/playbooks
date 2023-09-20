@@ -1,0 +1,207 @@
+---
+  
+  - name: Update and Upgrade APK
+    hosts: cln_testnet
+    become: yes
+    tags:
+      - apk
+    tasks:
+      - name: Update APK
+        tags:
+          - update
+        apt:
+          update_cache: yes
+
+      - name: Upgrade APK
+        tags:
+          - upgrade
+        apt:
+          upgrade: dist
+
+  - name: Increase file discriptor limit for processes
+    hosts: cln_testnet
+    become: yes
+    tags:
+      - file-discriptor
+    tasks:
+      - name: Add line to sysctl.conf
+        become: yes
+        lineinfile:
+          path: /etc/sysctl.conf
+          line: fs.file-max=512000
+        notify: Schedule_reboot
+    handlers:
+      - name: Schedule_reboot
+        reboot:
+          reboot_timeout: 300
+
+  - name: Install Packages
+    hosts: cln_testnet
+    become: yes
+    tags:
+      - install-packages
+    vars:
+      packages:
+        - build-essential
+        - libtool
+        - autotools-dev
+        - automake
+        - pkg-config
+        - libssl-dev
+        - libevent-dev
+        - bsdmainutils 
+        - libboost-system-dev 
+        - libboost-filesystem-dev 
+        - libboost-chrono-dev 
+        - libboost-program-options-dev 
+        - libboost-test-dev 
+        - libboost-thread-dev 
+        - libminiupnpc-dev 
+        - libzmq3-dev 
+    tasks:
+      - name: Install packages on Ubuntu
+        apt:
+          name: "{{ item }}"
+          state: present
+        loop: "{{ packages }}"
+  
+  - name: Clone Bitcoind
+    hosts: cln_testnet
+    tags:
+      - clone
+    tasks:
+      - name: Clone Bitcoind Git Repo
+        git:
+          repo: https://github.com/bitcoin/bitcoin.git
+          dest: /home/ubuntu/bitcoin 
+          version: v25.0 
+
+
+  - name: Configure, Compile, Install bitcoind
+    hosts: cln_testnet
+    tags:
+      - source
+    tasks:
+      - name: Run autogen.sh
+        tags:
+          - configure
+        shell: ./autogen.sh
+        args:
+          chdir: /home/ubuntu/bitcoin
+          executable: /bin/bash
+
+      - name: Configure Bitcoind
+        tags:
+          - configure 
+        shell: |
+          ./configure CXXFLAGS="--param ggc-min-expand=1 --param ggc-min-heapsize=32768" \
+                      --enable-cxx \
+                      --with-zmq \
+                      --without-gui \
+                      --disable-shared \
+                      --with-pic \
+                      --disable-tests \
+                      --disable-bench \
+                      --enable-upnp-default \
+                      --disable-wallet
+        args:
+          chdir: /home/ubuntu/bitcoin
+          executable: /bin/bash
+
+      - name: Compile Bitcoind 
+        tags:
+          - compile 
+        shell: make -j "$(($(nproc)+1))"
+        args:
+          chdir: /home/ubuntu/bitcoin
+          executable: /bin/bash
+
+      - name: Install Bitcoind 
+        become: yes
+        tags:
+          - install 
+        shell: make install
+        args:
+          chdir: /home/ubuntu/bitcoin
+          executable: /bin/bash
+
+  - name: Download auth script 
+    hosts: cln_testnet
+    tags:
+      - auth-script
+    tasks:
+      - name: Download rpcauth.py
+        get_url:
+          url: https://raw.githubusercontent.com/bitcoin/bitcoin/master/share/rpcauth/rpcauth.py
+          dest: /home/ubuntu/rpcauth.py
+
+  - name: Setup Bitcoin config
+    hosts: cln_testnet
+    tags:
+      - bitcoin-config
+    tasks:
+      - name: Make ~/.bitcoin directory
+        file:
+          path: /home/ubuntu/.bitcoin/
+          state: directory
+          mode: 0744
+
+      - name: Copy over bitcoin.conf 
+        copy:
+          src: ./bitcoin.conf 
+          dest: /home/ubuntu/.bitcoin/bitcoin.conf 
+
+  - name: Setup Bitcoin on systemd 
+    hosts: cln_testnet
+    become: yes
+    tags:
+      - systemd 
+    tasks:
+      - name: Copy over bitcoind.service 
+        copy:
+          src: ./bitcoind.service
+          dest: /etc/systemd/system/bitcoind.service
+
+  # - name: Setup Firewall
+  #   hosts: cln_testnet
+  #   become: yes
+  #   tags:
+  #     - ufw
+  #   tasks:
+  #     - name: Enable ufw
+  #       ufw:
+  #         state: enabled 
+  #
+  #     - name: Enable logging
+  #       ufw:
+  #         logging: 'on'
+  #
+  #     - name: Setup deny incomming requests
+  #       ufw:
+  #         rule: deny
+  #         direction: in
+  #
+  #     - name: Setup allow all outgoing reqeusts
+  #       ufw:
+  #         rule: allow 
+  #         direction: out
+  #
+  #     - name: Allow ssh
+  #       ufw:
+  #         name: ssh 
+  #         rule: allow
+  #
+  #     - name: Allow OpenSSH
+  #       ufw:
+  #         name: OpenSSH 
+  #         rule: allow
+  #
+  #     - name: Allow 9735
+  #       ufw:
+  #         name: '9735'
+  #         rule: allow
+  #
+  #     - name: Allow 10009
+  #       ufw:
+  #         name: '10009'
+  #         rule: allow

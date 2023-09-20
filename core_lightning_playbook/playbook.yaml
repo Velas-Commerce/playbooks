@@ -1,0 +1,133 @@
+---
+  
+  - name: Update and Upgrade APK
+    hosts: core_lightning_testnet
+    become: yes
+    tags:
+      - apt
+    tasks:
+      - name: Update APK
+        tags:
+          - update
+        apt:
+          update_cache: yes
+
+      - name: Upgrade APK
+        tags:
+          - upgrade
+        apt:
+          upgrade: dist
+
+
+  - name: Install Packages
+    hosts: core_lightning_testnet
+    become: yes
+    tags:
+      - install-packages
+    tasks:
+      - name: Install packages for Core-Lightning
+        apt:
+          name:
+            - python3-pip
+            - python3-json5 
+            - python3-flask 
+            - python3-gunicorn
+
+          state: present
+
+  - name: Install pip packages for Core-Lightning 
+    hosts: core_lightning_testnet
+    tags:
+      - pip
+    tasks:
+      - name: Install pip packages
+        pip: 
+          name:
+            - flask_restx 
+            - pyln-client
+            - pyopenssl
+            - cryptography
+          extra_args: --user
+  
+  - name: Download and extract Core-Lightning 
+    hosts: core_lightning_testnet
+    become: yes
+    tags:
+      - extract
+    tasks:
+      - name: Download clightning-v23.08.1-Ubuntu-22.04.tar.xz
+        get_url:
+          url: https://github.com/ElementsProject/lightning/releases/download/v23.08.1/clightning-v23.08.1-Ubuntu-22.04.tar.xz
+          dest: /home/ubuntu/clightning-v23.08.1-Ubuntu-22.04.tar.xz
+
+      - name: Extract clightning-v23.08.1-Ubuntu-22.04.tar.xz
+        become: yes
+        command: tar -xvf /home/ubuntu/clightning-v23.08.1-Ubuntu-22.04.tar.xz -C /usr/local --strip-components=2
+
+  - name: Setup golang
+    hosts: core_lightning_testnet
+    tags: 
+      - golang 
+    tasks:
+      - name: Download and extract Go
+        get_url:
+          url: https://go.dev/dl/go1.21.1.linux-amd64.tar.gz  # Replace with the desired Go version and architecture
+          dest: /tmp/go.tar.gz
+
+      - name: Extract Go
+        unarchive:
+          src: /tmp/go.tar.gz
+          dest: /usr/local/
+          remote_src: yes
+        become: yes
+
+      - name: Create Go folder
+        file:
+          path: "{{ ansible_env.HOME }}/go" 
+          state: directory
+
+      - name: Set up $GOROOT 
+        lineinfile:
+          path: "{{ ansible_env.HOME }}/.bashrc"
+          line: 'export GOROOT=/usr/local/go'
+        become: yes
+
+      - name: Set up $GOHOME 
+        lineinfile:
+          path: "{{ ansible_env.HOME }}/.bashrc"
+          line: "export GOHOME={{ ansible_env.HOME }}/go"
+        become: yes
+
+      - name: Set up $PATH
+        lineinfile:
+          path: "{{ ansible_env.HOME }}/.bashrc"
+          line: "export PATH=$PATH:$GOROOT/bin"
+        become: yes
+
+  - name: Setup Trustedcoin
+    hosts: core_lightning_testnet
+    tags:
+      - trustedcoin
+    tasks:
+      - name: Clone Trustedcoin
+        git:
+          repo: https://github.com/nbd-wtf/trustedcoin.git
+          dest: "{{ ansible_env.HOME }}/trustedcoin"
+
+      - name: Run go build
+        command:
+          cmd: go build
+        args:
+          chdir: "{{ ansible_env.HOME }}/trustedcoin"
+        environment:
+          PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin"
+
+
+
+
+
+
+
+
+
+

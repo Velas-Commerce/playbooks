@@ -1,0 +1,22 @@
+[Unit]
+Description=Bitcoin daemon
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/bitcoind
+
+# Process management
+####################
+
+Type=forking
+Restart=on-failure
+
+# Directory creation and permissions
+####################################
+
+# Run as ubuntu:ubuntu
+User=ubuntu
+Group=sudo
+
+[Install]
+WantedBy=multi-user.target
