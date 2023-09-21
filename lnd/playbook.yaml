@@ -117,8 +117,8 @@
 
       - name: Create lnd.conf 
         vars:
-          alias: wmp-lightning
-          color: 0000FF
+          alias: wmp-backup
+          color: "#0000FF"
           externalip: 127.0.0.1
           network: mainnet
           rpcpass: password

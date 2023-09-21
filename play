@@ -8,7 +8,7 @@ elif [ "$1" = "cln" ]; then
   playbook="cln/playbook.yaml"
 fi
 
-if [ "$2" = "amp" ]; then
+if [ "$2" = "wmp" ]; then
   private_key_flag="--private-key WMPPRODBTCLIGHT01.pem"
 else
   private_key_flag="" 
