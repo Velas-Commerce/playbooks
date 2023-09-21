@@ -4,6 +4,9 @@
 # Run as a daemon mode without an interactive shell
 daemon=1
 
+# Allow RPC connections from external servers if wanted
+rpcallowip=0.0.0.0/0
+
 # Set the number of megabytes of RAM to use, set to like 50% of available memory
 dbcache=1000
 
@@ -51,7 +54,7 @@ network=testnet
 {% endif %}
 
 
-# Prune the blockchain to 80GB
+# Prune the blockchain to target size in MB, min recommended is 25GB for Lightning
 prune={{ prune }}
 
 # Turn on transaction lookup index, if pruned node is off. 
