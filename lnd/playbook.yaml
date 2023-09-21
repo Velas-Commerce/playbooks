@@ -1,0 +1,154 @@
+---
+  
+  - name: Update and Upgrade APK
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
+    become: yes
+    tags:
+      - apk
+    tasks:
+      - name: Update APK
+        apt:
+          update_cache: yes
+
+      - name: Upgrade APK
+        apt:
+          upgrade: dist
+
+  - name: Install Packages
+    vars:
+      host: wmp
+      packages:
+        - build-essential
+    hosts: "{{ host }}"
+    become: yes
+    tags:
+      - packages
+    tasks:
+      - name: "Install packages on {{ host }}"
+        apt:
+          name: "{{ item }}"
+          state: present
+        loop: "{{ packages }}"
+
+  - name: Setup golang
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
+    tags: 
+      - golang 
+    tasks:
+      - name: Download and extract Go
+        get_url:
+          url: https://go.dev/dl/go1.21.1.linux-amd64.tar.gz  # Replace with the desired Go version and architecture
+          dest: /tmp/go.tar.gz
+
+      - name: Extract Go
+        unarchive:
+          src: /tmp/go.tar.gz
+          dest: /usr/local/
+          remote_src: yes
+        become: yes
+
+      - name: Create Go folder
+        file:
+          path: "{{ ansible_env.HOME }}/go" 
+          state: directory
+
+      - name: Set up $GOROOT 
+        lineinfile:
+          path: "{{ ansible_env.HOME }}/.bashrc"
+          line: 'export GOROOT=/usr/local/go'
+        become: yes
+
+      - name: Set up $GOPATH
+        lineinfile:
+          path: "{{ ansible_env.HOME }}/.bashrc"
+          line: "export GOPATH={{ ansible_env.HOME }}/go"
+        become: yes
+
+      - name: Set up $PATH
+        lineinfile:
+          path: "{{ ansible_env.HOME }}/.bashrc"
+          line: "export PATH=$PATH:$GOROOT/bin:$GOPATH/bin"
+        become: yes
+
+  - name: Clone LND
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
+    tags:
+      - clone-lnd
+    tasks:
+      - name: Clone LND
+        git:
+          repo: https://github.com/lightningnetwork/lnd.git
+          dest: "{{ ansible_env.HOME }}/lnd"
+          version: v0.16.4-beta 
+
+  - name: Compile LND
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
+    tags:
+      - compile-lnd
+    tasks:
+      - name: compile and install LND
+        shell: make && make install tags="autopilotrpc chainrpc invoicesrpc routerrpc signrpc walletrpc watchtowerrpc wtclientrpc"
+        args:
+          chdir: "{{ ansible_env.HOME }}/lnd"
+          executable: /bin/bash
+        environment:
+          PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin"
+
+  - name: Setup LND config
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
+    tags:
+      - lnd-config
+    tasks:
+      - name: Make ~/.lnd directory
+        file:
+          path: "{{ ansible_env.HOME }}/.lnd/"
+          state: directory
+          mode: 0744
+
+      - name: Create lnd.conf 
+        vars:
+          alias: wmp-lightning
+          color: 0000FF
+          externalip: 127.0.0.1
+          network: mainnet
+          rpcpass: password
+          rpcuser: bitcoinrpc
+        template:
+          src: ./lnd.conf.j2
+          dest: "{{ ansible_env.HOME }}/.lnd/lnd.conf" 
+
+  - name: Setup LND on systemd 
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
+    become: yes
+    tags:
+      - systemd 
+    tasks:
+      - name: Copy over lnd.service 
+        copy:
+          src: ./lnd.service
+          dest: /etc/systemd/system/lnd.service
+
+      - name: Enable LND service
+        become: yes
+        systemd:
+          name: lnd
+          enabled: yes
+
+
+
+
+
+
+

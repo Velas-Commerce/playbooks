@@ -1,0 +1,21 @@
+#!/bin/bash
+
+if [ "$1" = "lnd" ]; then
+  playbook="lnd/playbook.yaml"
+elif [ "$1" = "bitcoind" ]; then
+  playbook="bitcoind/playbook.yaml"
+elif [ "$1" = "cln" ]; then
+  playbook="cln/playbook.yaml"
+fi
+
+if [ "$2" = "amp" ]; then
+  private_key_flag="--private-key WMPPRODBTCLIGHT01.pem"
+else
+  private_key_flag="" 
+fi
+
+execute="ansible-playbook -i inventory.ini $private_key_flag $playbook -t $3 -v"
+
+echo $execute
+
+eval $execute

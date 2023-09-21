@@ -1,0 +1,19 @@
+[Unit]
+Description=LND Lightning Network Daemon
+Requires=bitcoind.service
+After=bitcoind.service
+
+[Service]
+ExecStart=/home/ubuntu/go/bin/lnd
+PIDFile=/home/ubuntu/.lnd/lnd.pid
+
+User=ubuntu
+Group=ubuntu
+
+Type=simple
+Restart=always
+RestartSec=120
+
+[Install]
+WantedBy=multi-user.target
+

@@ -188,3 +188,14 @@
         copy:
           src: ./bitcoind.service
           dest: /etc/systemd/system/bitcoind.service
+
+      - name: Enable bitcoind service
+        become: yes
+        systemd:
+          name: bitcoind
+          enabled: yes
+
+
+
+
+
