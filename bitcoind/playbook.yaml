@@ -1,28 +1,44 @@
 ---
   
+  - name: "Check if ansible is able to connect to {{ host }}"
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
+    tags:
+      - debug
+    tasks:
+      - name: debug check connection 
+        debug:
+          msg: "you are connected to {{ host }}"
+      - name: touch a file in {{ host }} to confirm you got in 
+        file:
+          path: "{{ ansible_env.HOME }}/foobar"
+          state: touch
+
+
   - name: Update and Upgrade APK
-    hosts: cln_testnet
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
     become: yes
     tags:
       - apk
     tasks:
       - name: Update APK
-        tags:
-          - update
         apt:
           update_cache: yes
 
       - name: Upgrade APK
-        tags:
-          - upgrade
         apt:
           upgrade: dist
 
-  - name: Increase file discriptor limit for processes
-    hosts: cln_testnet
+  - name: Increase file descriptor limit for processes
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
     become: yes
     tags:
-      - file-discriptor
+      - file-descriptor-limit
     tasks:
       - name: Add line to sysctl.conf
         become: yes
@@ -36,11 +52,8 @@
           reboot_timeout: 300
 
   - name: Install Packages
-    hosts: cln_testnet
-    become: yes
-    tags:
-      - install-packages
     vars:
+      host: wmp
       packages:
         - build-essential
         - libtool
@@ -58,41 +71,47 @@
         - libboost-thread-dev 
         - libminiupnpc-dev 
         - libzmq3-dev 
+    hosts: "{{ host }}"
+    become: yes
+    tags:
+      - packages
     tasks:
-      - name: Install packages on Ubuntu
+      - name: "Install packages on {{ host }}"
         apt:
           name: "{{ item }}"
           state: present
         loop: "{{ packages }}"
   
   - name: Clone Bitcoind
-    hosts: cln_testnet
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
     tags:
       - clone
     tasks:
       - name: Clone Bitcoind Git Repo
         git:
           repo: https://github.com/bitcoin/bitcoin.git
-          dest: /home/ubuntu/bitcoin 
+          dest: "{{ ansible_env.HOME }}/bitcoin"
           version: v25.0 
 
 
   - name: Configure, Compile, Install bitcoind
-    hosts: cln_testnet
+    vars:
+      host: wmp
+      compile: false
+      install: false
+    hosts: "{{ host }}"
     tags:
-      - source
+      - compile-bitcoind
     tasks:
       - name: Run autogen.sh
-        tags:
-          - configure
         shell: ./autogen.sh
         args:
-          chdir: /home/ubuntu/bitcoin
+          chdir: "{{ ansible_env.HOME }}/bitcoin"
           executable: /bin/bash
 
       - name: Configure Bitcoind
-        tags:
-          - configure 
         shell: |
           ./configure CXXFLAGS="--param ggc-min-expand=1 --param ggc-min-heapsize=32768" \
                       --enable-cxx \
@@ -105,16 +124,15 @@
                       --enable-upnp-default \
                       --disable-wallet
         args:
-          chdir: /home/ubuntu/bitcoin
+          chdir: "{{ ansible_env.HOME }}/bitcoin"
           executable: /bin/bash
 
       - name: Compile Bitcoind 
-        tags:
-          - compile 
         shell: make -j "$(($(nproc)+1))"
         args:
-          chdir: /home/ubuntu/bitcoin
+          chdir: "{{ ansible_env.HOME }}/bitcoin"
           executable: /bin/bash
+        when: compile
 
       - name: Install Bitcoind 
         become: yes
@@ -122,37 +140,46 @@
           - install 
         shell: make install
         args:
-          chdir: /home/ubuntu/bitcoin
+          chdir: "{{ ansible_env.HOME }}/bitcoin"
           executable: /bin/bash
+        when: install
 
   - name: Download auth script 
-    hosts: cln_testnet
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
     tags:
       - auth-script
     tasks:
       - name: Download rpcauth.py
         get_url:
           url: https://raw.githubusercontent.com/bitcoin/bitcoin/master/share/rpcauth/rpcauth.py
-          dest: /home/ubuntu/rpcauth.py
+          dest: "{{ ansible_env.HOME }}/rpcauth.py"
 
   - name: Setup Bitcoin config
-    hosts: cln_testnet
+    vars:
+      host: wmp
+      network: mainnet
+      prune: 25000
+    hosts: "{{ host }}"
     tags:
       - bitcoin-config
     tasks:
       - name: Make ~/.bitcoin directory
         file:
-          path: /home/ubuntu/.bitcoin/
+          path: "{{ ansible_env.HOME }}/.bitcoin/"
           state: directory
           mode: 0744
 
-      - name: Copy over bitcoin.conf 
-        copy:
-          src: ./bitcoin.conf 
-          dest: /home/ubuntu/.bitcoin/bitcoin.conf 
+      - name: Create bitcoin.conf 
+        template:
+          src: ./bitcoin.conf.j2
+          dest: "{{ ansible_env.HOME }}/.bitcoin/bitcoin.conf" 
 
   - name: Setup Bitcoin on systemd 
-    hosts: cln_testnet
+    vars:
+      host: wmp
+    hosts: "{{ host }}"
     become: yes
     tags:
       - systemd 
@@ -161,47 +188,3 @@
         copy:
           src: ./bitcoind.service
           dest: /etc/systemd/system/bitcoind.service
-
-  # - name: Setup Firewall
-  #   hosts: cln_testnet
-  #   become: yes
-  #   tags:
-  #     - ufw
-  #   tasks:
-  #     - name: Enable ufw
-  #       ufw:
-  #         state: enabled 
-  #
-  #     - name: Enable logging
-  #       ufw:
-  #         logging: 'on'
-  #
-  #     - name: Setup deny incomming requests
-  #       ufw:
-  #         rule: deny
-  #         direction: in
-  #
-  #     - name: Setup allow all outgoing reqeusts
-  #       ufw:
-  #         rule: allow 
-  #         direction: out
-  #
-  #     - name: Allow ssh
-  #       ufw:
-  #         name: ssh 
-  #         rule: allow
-  #
-  #     - name: Allow OpenSSH
-  #       ufw:
-  #         name: OpenSSH 
-  #         rule: allow
-  #
-  #     - name: Allow 9735
-  #       ufw:
-  #         name: '9735'
-  #         rule: allow
-  #
-  #     - name: Allow 10009
-  #       ufw:
-  #         name: '10009'
-  #         rule: allow

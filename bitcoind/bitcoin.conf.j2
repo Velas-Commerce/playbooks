@@ -42,11 +42,17 @@ server=1
 # Reduce the log file size on restarts
 shrinkdebuglog=1
 
-# Set testnet if needed
+{% if network == 'mainnet' %}
+testnet=0
+network=mainnet
+{% elif network == 'testnet' %}
 testnet=1
+network=testnet
+{% endif %}
+
 
 # Prune the blockchain to 80GB
-prune=25000
+prune={{ prune }}
 
 # Turn on transaction lookup index, if pruned node is off. 
 txindex=0
