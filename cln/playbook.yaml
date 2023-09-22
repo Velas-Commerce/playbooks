@@ -1,10 +1,25 @@
 ---
   
+  - name: "Debug if ansible is able to connect to {{ host }}"
+    vars:
+      host: workit
+    hosts: "{{ host }}"
+    tags:
+      - debug
+    tasks:
+      - name: debug check connection 
+        debug:
+          msg: "you are connected to {{ host }}"
+      - name: touch a file in {{ host }} to confirm you got in 
+        file:
+          path: "{{ ansible_env.HOME }}/foobar"
+          state: touch
+
   - name: Update and Upgrade APK
-    hosts: core_lightning_testnet
+    hosts: workit
     become: yes
     tags:
-      - apt
+      - apk
     tasks:
       - name: Update APK
         tags:
@@ -20,58 +35,108 @@
 
 
   - name: Install Packages
-    hosts: core_lightning_testnet
+    hosts: workit
     become: yes
     tags:
-      - install-packages
+      - packages
     tasks:
       - name: Install packages for Core-Lightning
         apt:
           name:
+            - libpq-dev
             - python3-pip
             - python3-json5 
             - python3-flask 
             - python3-gunicorn
+            - autoconf 
+            - automake 
+            - build-essential 
+            - git 
+            - libtool 
+            - libsqlite3-dev 
+            - python3 
+            - python3-pip 
+            - net-tools 
+            - zlib1g-dev 
+            - libsodium-dev 
+            - gettext
+            - valgrind 
+            - libpq-dev 
+            - shellcheck 
+            - cppcheck
+            - libsecp256k1-dev 
+            - jq 
+            - lowdown
+            - cargo 
+            - rustfmt 
+            - protobuf-compiler
 
           state: present
 
   - name: Install pip packages for Core-Lightning 
-    hosts: core_lightning_testnet
+    hosts: workit
     tags:
       - pip
     tasks:
+      - name: Upgrade pip
+        pip:
+          name: pip
+          state: latest
+        become: yes
+
       - name: Install pip packages
         pip: 
           name:
+            - flask_socketio
             - flask_restx 
             - pyln-client
             - pyopenssl
             - cryptography
+            - mako
           extra_args: --user
-  
+ 
+  - name: Clone and build Core-Lightning
+    hosts: workit 
+    tags:
+      - compile-cln
+    tasks:
+      - name: Clone Lightning
+        git:
+          repo: https://github.com/ElementsProject/lightning.git
+          dest: "{{ ansible_env.HOME }}/lightning"
+          version: v23.08.1 
+
   - name: Download and extract Core-Lightning 
-    hosts: core_lightning_testnet
+    hosts: workit
     become: yes
     tags:
-      - extract
+      - download-clightning-extract
+    vars:
+      - version: v23.08.1
+      - architecture: Ubuntu-22.04
     tasks:
-      - name: Download clightning-v23.08.1-Ubuntu-22.04.tar.xz
+      - name: Download clightning-{{ version }}-{{ architecture }}.tar.xz
         get_url:
-          url: https://github.com/ElementsProject/lightning/releases/download/v23.08.1/clightning-v23.08.1-Ubuntu-22.04.tar.xz
-          dest: /home/ubuntu/clightning-v23.08.1-Ubuntu-22.04.tar.xz
+          url: https://github.com/ElementsProject/lightning/releases/download/{{ version }}/clightning-{{ version }}-{{ architecture }}.tar.xz
+          dest: /tmp/clightning.tar.xz
+        when: false
 
-      - name: Extract clightning-v23.08.1-Ubuntu-22.04.tar.xz
+      - name: Extract clightning.tar.xz
         become: yes
-        command: tar -xvf /home/ubuntu/clightning-v23.08.1-Ubuntu-22.04.tar.xz -C /usr/local --strip-components=2
+        command: tar -xvf /tmp/clightning.tar.xz -C /usr/local --strip-components=2
+        when: false
 
   - name: Setup golang
-    hosts: core_lightning_testnet
+    hosts: workit
     tags: 
       - golang 
+    vars:
+      - version: go1.21.1
+      - architecture: linux-amd64
     tasks:
       - name: Download and extract Go
         get_url:
-          url: https://go.dev/dl/go1.21.1.linux-amd64.tar.gz  # Replace with the desired Go version and architecture
+          url: https://go.dev/dl/{{ version }}.{{ architecture }}.tar.gz  # Replace with the desired Go version and architecture
           dest: /tmp/go.tar.gz
 
       - name: Extract Go
@@ -92,20 +157,20 @@
           line: 'export GOROOT=/usr/local/go'
         become: yes
 
-      - name: Set up $GOHOME 
+      - name: Set up $GOPATH
         lineinfile:
           path: "{{ ansible_env.HOME }}/.bashrc"
-          line: "export GOHOME={{ ansible_env.HOME }}/go"
+          line: "export GOPATH={{ ansible_env.HOME }}/go"
         become: yes
 
       - name: Set up $PATH
         lineinfile:
           path: "{{ ansible_env.HOME }}/.bashrc"
-          line: "export PATH=$PATH:$GOROOT/bin"
+          line: "export PATH=$PATH:$GOROOT/bin:$GOPATH/bin"
         become: yes
 
-  - name: Setup Trustedcoin
-    hosts: core_lightning_testnet
+  - name: Setup Trustedcoin Plugin
+    hosts: workit
     tags:
       - trustedcoin
     tasks:
@@ -122,7 +187,67 @@
         environment:
           PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin"
 
+      - name: Make ~/.lightning/plugins directory
+        file:
+          path: "{{ ansible_env.HOME }}/.lightning/plugins"
+          state: directory
+          mode: 0744
 
+      - name: Copy trustedcoin to plugins directory 
+        copy:
+          src: "{{ ansible_env.HOME }}/trustedcoin/trustedcoin"
+          dest: "{{ ansible_env.HOME }}/.lightning/plugins/trustedcoin"
+          remote_src: true
+          mode: "0777"
+
+
+  - name: Setup CLN config 
+    hosts: workit
+    tags:
+      - cln-config 
+    tasks:
+      - name: Create config 
+        vars:
+          alias: workit
+          rgb: CA1F7B
+          network: testnet
+          log_prefix: workit@
+          rpcuser: rpcuser
+          rpcpassword: password
+          rpcport: 18332 
+          rpcconnect: 127.0.0.1
+        template:
+          src: ./config.j2
+          dest: "{{ ansible_env.HOME }}/.lightning/config" 
+
+      - name: Setup alias for lightningd
+        lineinfile:
+          path: "{{ ansible_env.HOME }}/.bashrc"
+          line: "alias lightningd='lightningd --conf={{ ansible_env.HOME }}/.lightning/config --log-file={{ ansible_env.HOME }}/.lightning/logs --testnet'"
+
+      - name: Setup alias for lightning-cli
+        lineinfile:
+          path: "{{ ansible_env.HOME }}/.bashrc"
+          line: "alias lightning-cli='lightning-cli --rpc-file={{ ansible_env.HOME }}/.lightning/testnet/lightning-rpc'"
+
+  - name: Setup CLN on systemd 
+    vars:
+      host: workit
+    hosts: "{{ host }}"
+    become: yes
+    tags:
+      - systemd 
+    tasks:
+      - name: Copy over clightning.service 
+        template:
+          src: ./clightning.service.j2
+          dest: /etc/systemd/system/clightning.service
+
+      - name: Enable clightning service
+        become: yes
+        systemd:
+          name: clightning
+          enabled: yes
 
 
 
