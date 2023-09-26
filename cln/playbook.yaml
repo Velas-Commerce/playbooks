@@ -238,15 +238,15 @@
     tags:
       - systemd 
     tasks:
-      - name: Copy over clightning.service 
+      - name: Copy over lightningd.service 
         template:
-          src: ./clightning.service.j2
-          dest: /etc/systemd/system/clightning.service
+          src: ./lightningd.service.j2
+          dest: /etc/systemd/system/lightningd.service
 
-      - name: Enable clightning service
+      - name: Enable lightningd service
         become: yes
         systemd:
-          name: clightning
+          name: lightningd
           enabled: yes
 
 

@@ -17,6 +17,9 @@ coop-close-target-confs=1000
 # Log levels
 debuglevel=CNCT=debug,CRTR=debug,HSWC=debug,NTFN=debug,RPCS=debug
 
+# Specify the interfaces to listen on for REST connections ipv4 interface on port 8080
+restlisten=0.0.0.0:8080
+
 # Public P2P IP (remove this if using Tor)
 externalip={{ externalip }}
 
@@ -25,6 +28,7 @@ gc-canceled-invoices-on-startup=1
 gc-canceled-invoices-on-the-fly=1
 
 # Avoid historical graph data sync
+# this need to be commented out if you want it to work with LDK
 ignore-historical-gossip-filters=1
 
 # Set the maximum amount of commit fees in a channel
@@ -40,7 +44,7 @@ max-commit-fee-rate-anchors=100
 maxpendingchannels=10
 
 # Min inbound channel limit
-minchansize=100000
+minchansize=500000
 
 # gRPC socket binding
 rpclisten=0.0.0.0:10009
@@ -115,10 +119,11 @@ protocol.wumbo-channels=1
 
 [routerrpc]
 # Set default chance of a hop success
-routerrpc.apriorihopprob=0.5
+# routerrpc.apriorihopprob=0.5
+routerrpc.apriori.hopprob=0.5
 
 # Start to ignore nodes if they return many failures (set to 1 to turn off)
-routerrpc.aprioriweight=0.75
+routerrpc.apriori.weight=0.75
 
 # Set minimum desired savings of trying a cheaper path
 routerrpc.attemptcost=10
@@ -131,7 +136,8 @@ routerrpc.maxmchistory=10000
 #routerrpc.minrtprob=0.005
 
 # Set the time to forget past routing failures
-routerrpc.penaltyhalflife=0h10m0s
+# routerrpc.penaltyhalflife=0h10m0s
+routerrpc.apriori.penaltyhalflife=0h10m0s
 
 [routing]
 # Remove channels from graph that have one side that hasn't made announcements

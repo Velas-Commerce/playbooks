@@ -1,0 +1,24 @@
+[Unit]
+Description=CLN Lightning Network Daemon
+Requires=bitcoind.service
+After=bitcoind.service
+
+[Service]
+ExecStart=/usr/local/bin/lightningd --conf=/home/ubuntu/.lightning/config --log-file=/home/ubuntu/.lightning/logs
+
+# Process management
+####################
+
+PIDFile=/home/ubuntu/.lightning/lightningd-testnet.pid
+Type=simple
+Restart=on-failure
+
+# Directory creation and permissions
+####################################
+
+# Run as ubuntu:ubuntu
+User=ubuntu
+Group=sudo
+
+[Install]
+WantedBy=multi-user.target
