@@ -146,9 +146,40 @@
           name: lnd
           enabled: yes
 
+  - name: Static Channel Backup 
+    vars:
+      host: wmp 
+    hosts: "{{ host }}" 
+    become: yes
+    tags:
+      - static-channel-backup 
+    tasks:
+      - name: Install inotify 
+        apt:
+          name:  inotify-tools 
+          state: present
+          
+      - name: Copy backup script 
+        vars:
+          path: /home/ubuntu/.lnd/data/chain/bitcoin/mainnet/channel.backup
+          dest: root@69.167.152.90:/root/node2-static-channel-backups
+        template:
+          src: ./static-channel-backup.sh.j2
+          dest: /home/ubuntu/static-channel-backup.sh
+          mode: "0777"
 
+      - name: Copy over static-channel-backup.service 
+        vars:
+          path: /home/ubuntu/static-channel-backup.sh
+        template:
+          src: ./static-channel-backup.service.j2
+          dest: /etc/systemd/system/static-channel-backup.service
 
-
+      - name: Enable Static-channel-backup service
+        become: yes
+        systemd:
+          name: static-channel-backup
+          enabled: yes
 
 
 

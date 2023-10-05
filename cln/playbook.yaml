@@ -93,6 +93,7 @@
             - pyopenssl
             - cryptography
             - mako
+            - pyln-client
           extra_args: --user
  
   - name: Clone and build Core-Lightning
@@ -200,6 +201,23 @@
           remote_src: true
           mode: "0777"
 
+  - name: Setup zero-conf plugin 
+    hosts: workit 
+    tags: 
+      - zero-conf 
+    tasks:
+      - name: Make ~/.lightning/plugins directory
+        file:
+          path: "{{ ansible_env.HOME }}/.lightning/plugins"
+          state: directory
+          mode: 0744
+
+      - name: Copy zero-conf.py to plugins directory 
+        copy:
+          src: "./zero-conf.py"
+          dest: "{{ ansible_env.HOME }}/.lightning/plugins/zero-conf.py"
+          remote_src: false
+          mode: "0777"
 
   - name: Setup CLN config 
     hosts: workit
@@ -249,6 +267,21 @@
           name: lightningd
           enabled: yes
 
+  - name: Setup RTL 
+    vars:
+      host: workit 
+      NODEJS_VERSION: "8"
+    hosts: "{{ host }}"
+    become: yes 
+    tags:
+      - rtl 
+    tasks:
+      - name: Install the nodejs
+        apt:
+          name: 
+            - nodejs
+            - npm
+          state: present
 
 
 

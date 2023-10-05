@@ -4,7 +4,7 @@ Requires=bitcoind.service
 After=bitcoind.service
 
 [Service]
-ExecStart=/usr/local/bin/lightningd --conf=/home/ubuntu/.lightning/config --log-file=/home/ubuntu/.lightning/logs
+ExecStart=/usr/local/bin/lightningd --conf=/home/ubuntu/.lightning/config --log-file=/home/ubuntu/.lightning/logs --zeroconf-allow=02d3ca58dcae5a04192310dacdde972ab3e299f86b471aa2a06377bc61d9fdd130
 
 # Process management
 ####################
